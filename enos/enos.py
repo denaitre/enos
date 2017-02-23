@@ -187,8 +187,16 @@ def install_os(env=None, **kwargs):
         'neutron_external_address':   pop_ip(env),
         'network_interface':          env['eths'][NETWORK_IFACE],
         'kolla_internal_vip_address': env['config']['vip'],
-        'neutron_external_interface': env['eths'][EXTERNAL_IFACE]
+        'neutron_external_interface': env['eths'][EXTERNAL_IFACE],
+        'openstack_region_name':
+            env['config']['kolla']['openstack_region_name']
     }
+
+    # If an admin region vip is provided, give it to kolla
+    if "region0_vip" in env['config']['kolla']:
+        generated_kolla_vars['region0_vip'] = \
+                env['config']['kolla']['region0_vip']
+
     generate_kolla_files(env['config']["kolla"],
                          generated_kolla_vars,
                          env['resultdir'])

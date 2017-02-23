@@ -191,8 +191,14 @@ def generate_kolla_files(config_vars, kolla_vars, directory):
 
     # admin openrc
     admin_openrc_path = os.path.join(directory, 'admin-openrc')
+
+    # if an admin region vip is provided, set it in admin_openrc
+    keystone_address = kolla_vars.get('region0_vip') or \
+                kolla_vars['kolla_internal_vip_address']
+
     admin_openrc_vars = {
-        'keystone_address': kolla_vars['kolla_internal_vip_address']
+        'keystone_address': keystone_address,
+        'openstack_region_name': kolla_vars['openstack_region_name']
     }
     render_template('admin-openrc.jinja2',
                     admin_openrc_vars,

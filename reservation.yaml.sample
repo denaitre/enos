@@ -7,7 +7,7 @@ name: OpenStack/Discovery-Enos2
 walltime: "2:00:00"
 
 resources:
-  paravance:
+  parasilo:
     control: 1
     compute: 1
     network: 1
@@ -42,8 +42,8 @@ registry:
 # Kolla parameteres                               #
 # ############################################### #
 # Repository
-kolla_repo: "https://git.openstack.org/openstack/kolla-ansible"
-kolla_ref: "stable/ocata"
+kolla_repo: "https://github.com/rcherrueau/kolla-ansible.git"
+kolla_ref: "multi-regions"
 
 # globals.yml
 kolla:
@@ -51,3 +51,4 @@ kolla:
   kolla_install_type: "source"
   docker_namespace: "beyondtheclouds"
   enable_heat: "no"
+  openstack_region_name: "RegionOne"
