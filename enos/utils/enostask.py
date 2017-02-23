@@ -1,13 +1,25 @@
 # -*- coding: utf-8 -*-
-from constants import SYMLINK_NAME
 from functools import wraps
 
 import os
 import yaml
 import logging
 
+def make_env(working_dir=None):
+    """Loads the env from `working_dir` if not `None` or makes a new one.
 
-def load_env():
+    An Enos environment handles all specific variables of an
+    experiment. This function either generates a new environment or
+    loads a previous one. If the value of `working_dir` is `None`, then
+    this function makes a new environment and return it. If the value
+    is a directory path that contains an Enos environment, then this function
+    loads and returns it.
+
+    In case of a directory path, this function also rereads the
+    configuration file (the reservation.yaml) and reloads it. This
+    lets the user update his configuration between each phase.
+
+    """
     env = {
         'config':      {},  # The config
         'resultdir':   '',  # Path to the result directory
@@ -17,12 +29,14 @@ def load_env():
         'user':        ''   # User id for this job
     }
 
-    # Loads the previously saved environment (if any)
-    env_path = os.path.join(SYMLINK_NAME, 'env')
-    if os.path.isfile(env_path):
-        with open(env_path, 'r') as f:
-            env.update(yaml.load(f))
-            logging.debug("Reloaded config %s", env['config'])
+    # A new environment is returned if the `env` file does not exist
+    if working_dir:
+        env_path = os.path.join(working_dir, 'env')
+
+        if os.path.isfile(env_path):
+            with open(env_path, 'r') as f:
+                env.update(yaml.load(f))
+                logging.debug("Loaded environment %s", env_path)
 
     # Resets the configuration of the environment
     if os.path.isfile(env['config_file']):
@@ -62,10 +76,11 @@ def enostask(doc):
             env = load_env()
             kwargs['env'] = env
 
-            # Proceeds with the function executio
+            # Proceeds with the function execution
             fn(*args, **kwargs)
 
             # Save the environment
             save_env(env)
+
         return decorated
     return decorator

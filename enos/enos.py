@@ -71,6 +71,28 @@ Options:
 def up(provider=None, env=None, **kwargs):
     logging.debug('phase[up]: args=%s' % kwargs)
 
+    # Generates a directory for results
+    resultdir_name = 'enos_' + datetime.today().isoformat()
+    if kwargs['--env']:
+        resultdir_name = kwargs['--env']
+    resultdir = os.path.join(CALL_PATH, resultdir_name)
+    try:
+        os.mkdir(resultdir)
+    except OSError:
+        pass
+    logging.info('Generates result directory %s' % resultdir_name)
+    env['resultdir'] = resultdir
+
+    # Symlink the result directory with the current directory
+    link = os.path.abspath(SYMLINK_NAME)
+    try:
+        os.remove(link)
+    except OSError:
+        pass
+    # NOTE(dpertin): race condition here when regions deployed at the same time
+    os.symlink(env['resultdir'], link)
+    logging.info("Symlinked %s to %s" % (env['resultdir'], link))
+
     # Loads the configuration file
     config_file = kwargs['-f']
     if os.path.isfile(config_file):
@@ -114,7 +136,8 @@ def up(provider=None, env=None, **kwargs):
         'registry_vip': pop_ip(env),
         'influx_vip':   pop_ip(env),
         'grafana_vip':  pop_ip(env),
-        'network_interface': eths[NETWORK_IFACE]
+        'network_interface': eths[NETWORK_IFACE],
+        'resultdir':    env['resultdir']
     })
     passwords = os.path.join(TEMPLATE_DIR, "passwords.yml")
     with open(passwords) as f:
@@ -146,7 +169,14 @@ Options:
   -h --help            Show this help message.
   -t TAGS --tags=TAGS  Only run ansible tasks tagged with these values.
   --reconfigure        Reconfigure the services after a deployment.
-""")
+  -e ENV --env=ENV     Path to the environment yaml file. You should
+                       use this option when you wanna link a specific
+                       experiment [default: %s].
+  -h --help            Show this help message.
+  -v --version         Show version number.
+  -vv                  Verbose mode.
+  -s --silent          Quiet mode.
+""" % SYMLINK_NAME)
 def install_os(env=None, **kwargs):
     logging.debug('phase[os]: args=%s' % kwargs)
 
@@ -185,9 +215,14 @@ def install_os(env=None, **kwargs):
     else:
         kolla_cmd.append('deploy')
 
-    kolla_cmd.extend(["-i", "%s/multinode" % SYMLINK_NAME,
-                      "--passwords", "%s/passwords.yml" % SYMLINK_NAME,
-                      "--configdir", "%s" % SYMLINK_NAME])
+    # override default working dir if --env parameter is given
+    working_dir = SYMLINK_NAME
+    if kwargs['--env']:
+        working_dir = kwargs['--env']
+
+    kolla_cmd.extend(["-i", "%s/multinode" % working_dir,
+                      "--passwords", "%s/passwords.yml" % working_dir,
+                      "--configdir", "%s" % working_dir])
 
     if kwargs['--tags']:
         kolla_cmd.extend(['--tags', kwargs['--tags']])
@@ -209,8 +244,14 @@ Options:
 """)
 def init_os(env=None, **kwargs):
     logging.debug('phase[init]: args=%s' % kwargs)
+
+    # override default working dir if --env parameter is given
+    working_dir = SYMLINK_NAME
+    if kwargs['--env']:
+        working_dir = kwargs['--env']
+
     cmd = []
-    cmd.append('. %s' % os.path.join(SYMLINK_NAME, 'admin-openrc'))
+    cmd.append('. %s' % os.path.join(working_dir, 'admin-openrc'))
     # add cirros image
     images = [{'name': 'cirros.uec', 'url':'http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img'}]
     for image in images:
@@ -330,6 +371,11 @@ def bench(env=None, **kwargs):
             product.append(dict(e))
         return product
 
+    # override default working dir if --env parameter is given
+    working_dir = SYMLINK_NAME
+    if kwargs['--env']:
+        env_dir = kwargs['--env']
+
     logging.debug('phase[bench]: args=%s' % kwargs)
     workload_dir = kwargs["--workload"]
     with open(os.path.join(workload_dir, "run.yml")) as workload_f:
@@ -348,7 +394,7 @@ def bench(env=None, **kwargs):
                     continue
                 for a in cartesian(top_args):
                     playbook_path = os.path.join(ANSIBLE_DIR, 'run-bench.yml')
-                    inventory_path = os.path.join(SYMLINK_NAME, 'multinode')
+                    inventory_path = os.path.join(working_dir, 'multinode')
                     # NOTE(msimonin) all the scenarios must reside on the workload directory
                     env['config']['bench'] = {
                         'type': bench_type,
@@ -513,7 +559,19 @@ Options:
   --provider=PROVIDER  The provider name [default: G5k].
 """)
 def deploy(**kwargs):
+    # --reconfigure and --tags can not be provided in 'deploy'
+    # but they are required for 'up' and 'install_os'
+    kwargs['--reconfigure'] = False
+    kwargs['--tags'] = None
+
     up(**kwargs)
+
+    # If the user doesn't specify an experiment, then set the ENV directory to
+    # the default one
+    if not kwargs['--env']:
+        kwargs['--env'] = SYMLINK_NAME
+        #kwargs['--env'] = os.path.join(kwargs['env']['resultdir'], 'env')
+
     install_os(**kwargs)
     init_os(**kwargs)
 
