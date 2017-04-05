@@ -1,0 +1,66 @@
+---
+# ############################################### #
+# Enos Configuration File                         #
+# ############################################### #
+
+
+multiregion:
+
+  description:
+    region_keystone:
+      provide:
+        control:
+          - disco/registry
+          - disco/grafana
+          - disco/influx
+          - disco/bench
+          - network
+          - compute
+          - memcached
+          - mariadb
+          - rabbitmq
+          - keystone
+          - glance
+          - nova
+          - neutron-server
+          - horizon
+          - placement-api
+          - haproxy
+          - neutron
+          # wtf
+#          - senlin
+#          - storage
+#          - searchlight
+#          - watcher
+#          - ceph
+#          - sahara
+#          - ironic
+#          - ceilometer
+#          - gnocchi
+#          - placement
+#          - cloudkitty
+#          - congress
+#          - heat
+#          - trove
+#          - aodh
+#          - karbor
+#          - murano
+#          - freezer
+#          - mistral
+#          - octavia
+#          - solum
+#          - manila
+#          - magnum
+#          - cinder
+#          - swift
+#          - barbican
+#          - panko
+#          - designate
+  
+  
+  assembly:
+    region_keystone:
+      paravance:
+        name: OpenStack-MultiRegionOne
+        walltime: "4:00:00"
+

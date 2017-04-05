@@ -1,0 +1,56 @@
+---
+# ############################################### #
+# Enos Configuration File                         #
+# ############################################### #
+
+name: {{ reservation_name }}
+
+# Resources Provider. Values are: g5k, vagrant
+provider: "g5k"
+
+walltime: "4:00:00"
+
+resources:
+  {{ cluster }}:
+  {% for role in roles %}
+  {{ role }}: 1
+  {% endfor %}
+
+vlans:
+  # mandatory : you need to have exacly one vlan
+  rennes: "{type='kavlan'}/vlan=1"
+
+# Be less strict on node distribution especially
+# when nodes are missing in the reservation
+# or not deployed
+role_distribution: debug
+
+# ############################################### #
+# Inventory to use                                #
+# ############################################### #
+
+# This will describe the topology of your services
+inventory: {{ inventory }}
+
+# ############################################### #
+# docker registry parameters
+# ############################################### #
+registry:
+  ceph: false
+  ceph_keyring: /home/dpertin/.ceph/ceph.client.dpertin.keyring
+  ceph_id: dpertin
+  ceph_rbd: dpertin_registry/data
+
+# ############################################### #
+# Kolla parameteres                               #
+# ############################################### #
+# Repository
+kolla_repo: "https://git.openstack.org/openstack/kolla-ansible"
+kolla_ref: "stable/ocata"
+
+# globals.yml
+kolla:
+  kolla_base_distro: "centos"
+  kolla_install_type: "source"
+  docker_namespace: "beyondtheclouds"
+  enable_heat: "no"

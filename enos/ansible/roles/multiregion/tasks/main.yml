@@ -1,0 +1,4 @@
+---
+- name: Generate Enos configuration files
+  local_action: template src={{ src }} dest={{ resultdir }}/reservation_{{ region }}
+

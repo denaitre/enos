@@ -35,7 +35,8 @@ from utils.constants import (SYMLINK_NAME, TEMPLATE_DIR, ANSIBLE_DIR,
                              NETWORK_IFACE, EXTERNAL_IFACE, VERSION)
 from utils.extra import (run_ansible, generate_inventory,
                          generate_kolla_files, to_abs_path,
-                         pop_ip)
+                         pop_ip,
+                         generate_inventory2)
 
 from utils.network_constraints import (build_grp_constraints,
                                        build_ip_constraints)
@@ -351,6 +352,94 @@ def init_os(env=None, **kwargs):
 
 
 @enostask("""
+usage: enos multiregions [-e ENV|--env=ENV] [-f CONFIG_PATH] [-v|-vv|-s|--silent]
+
+Generate Enos files required to deploy multiregions
+
+Options:
+  -e ENV --env=ENV     Path to the environment directory. You should
+                       use this option when you want to link a specific
+                       experiment [default: %s].
+  -f CONFIG_PATH       Path to the configuration file describing the
+                       deployment [default: ./reservation.yaml].
+  -h --help            Show this help message.
+  -v --version         Show version number.
+  -vv                  Verbose mode.
+  -s --silent          Quiet mode.
+
+""" % SYMLINK_NAME)
+def multiregions(env=None, **kwargs):
+    logging.debug('phase[multiregions]: args=%s' % kwargs)
+
+    # Generates a directory for results
+    resultdir_name = kwargs['--env'] or \
+            'enos_multi' + datetime.today().isoformat()
+
+    resultdir = os.path.join(CALL_PATH, resultdir_name)
+    # The result directory cannot be created if a related file exists
+    if os.path.isfile(resultdir):
+        logging.error("Result directory cannot be created due to %s" %
+                resultdir)
+        sys.exit(1)
+
+    # Create the result directory if it does not exist
+    os.path.isdir(resultdir) or os.mkdir(resultdir)
+    logging.info('Generate files in %s' % resultdir)
+    env['resultdir'] = resultdir
+
+    # Symlink the result directory with the current directory
+    link = os.path.abspath(SYMLINK_NAME)
+
+    os.path.lexists(link) and os.remove(link)
+    try:
+        os.symlink(env['resultdir'], link)
+        logging.info("Symlinked %s to %s" % (env['resultdir'], link))
+    except OSError:
+        # An harmless error can occur due to a race condition when multiple
+        # regions are simultaneously deployed
+        logging.warning("Symlink %s to %s failed" %
+                (env['resultdir'], link))
+        pass
+
+    # Loads the configuration file
+    config_file = kwargs['-f']
+    if os.path.isfile(config_file):
+        env['config_file'] = config_file
+        with open(config_file, 'r') as f:
+            env['config'].update(yaml.load(f))
+            logging.info("Reloaded config %s", env['config'])
+    else:
+        logging.error('Configuration file %s does not exist', config_file)
+        sys.exit(1)
+
+    env['inventory'] = '/home/dim/git/enos/inventories/inventory.template'
+    base_inventory = env['inventory']
+    regions = env['config']['multiregion']['description']
+    multiregion_playbook = os.path.join(ANSIBLE_DIR, 'multiregion.yml')
+    for region in regions:
+        # Generates inventory files
+        inventory = os.path.join(env['resultdir'], 'multinode_' + str(region))
+        roles = regions[region]['provide']
+        generate_inventory2(roles, base_inventory, inventory)
+        logging.info('Generates inventory %s' % inventory)
+        # Generates enos config files
+        # Set variables required by playbooks of the application
+        assembly = env['config']['multiregion']['assembly'][region]
+        cluster = assembly.keys()[0]
+        env['config'].update({
+            'region':               region,
+            'resultdir':            env['resultdir'],
+            'cluster':              cluster,
+            'reservation_name':     assembly[cluster]['name'],
+            'roles':                regions[region]['provide'].keys(),
+            'inventory':            inventory,
+            'src':                  '/home/dim/git/enos/reservation.yaml.template.j2'
+        })
+        run_ansible([multiregion_playbook], inventory, env['config'], None)
+
+
+
+@enostask("""
 usage: enos bench [--workload=WORKLOAD] [-e ENV|--env=ENV] [-v|-vv|-s|--silent]
 
 Run rally on this OpenStack.
@@ -641,6 +730,8 @@ def main():
         install_os(**docopt(install_os.__doc__, argv=argv))
     elif args['<command>'] == 'init':
         init_os(**docopt(init_os.__doc__, argv=argv))
+    elif args['<command>'] == 'multiregions':
+        multiregions(**docopt(multiregions.__doc__, argv=argv))
     elif args['<command>'] == 'bench':
         bench(**docopt(bench.__doc__, argv=argv))
     elif args['<command>'] == 'backup':

@@ -135,7 +135,7 @@ def to_ansible_group_string(roles):
     e.g
     {
     'role1': ['n1', 'n2', 'n3'],
-    'role12: ['n4']
+    'role2': ['n4']
 
     }
     ->
@@ -169,6 +169,55 @@ def to_ansible_group_string(roles):
         inventory.extend(map(lambda n: generate_inventory_string(n, role),
                              nodes))
     inventory.append("\n")
+    return "\n".join(inventory)
+
+
+def generate_inventory2(roles, base_inventory, dest):
+    """
+    Generate inventory files for the multiregion.
+    It will generate a group for each role in roles and
+    concatenate them with the base_inventory file.
+    The generated inventory is written in dest
+    """
+    with open(dest, 'w') as f:
+        f.write(to_ansible_group_string2(roles))
+        with open(base_inventory, 'r') as a:
+            for line in a:
+                f.write(line)
+
+    logging.info("Inventory file written to " + dest)
+
+
+def to_ansible_group_string2(roles):
+    """Transform a role list to an ansible list of groups (inventory)
+    e.g
+    {
+    'role1': ['n1', 'n2', 'n3'],
+    'role2': ['n4']
+
+    }
+    ->
+    [n1:children]
+    role1
+
+    [n2:children]
+    role1
+
+    [n3:children]
+    role1
+
+    [n4:children]
+    role2
+    """
+    inventory = []
+    inventory.append("\n")
+
+    for role, nodes in roles.items():
+        for node in nodes:
+            #inventory.append("[%s:children]" % (node))
+            inventory.append("[%s]" % (node))
+            inventory.append("%s\n" % (role))
+
     return "\n".join(inventory)
 
 
