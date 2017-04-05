@@ -424,18 +424,19 @@ def multiregions(env=None, **kwargs):
         logging.info('Generates inventory %s' % inventory)
         # Generates enos config files
         # Set variables required by playbooks of the application
-        assembly = env['config']['multiregion']['assembly'][region]
-        cluster = assembly.keys()[0]
-        env['config'].update({
-            'region':               region,
-            'resultdir':            env['resultdir'],
-            'cluster':              cluster,
-            'reservation_name':     assembly[cluster]['name'],
-            'roles':                regions[region]['provide'].keys(),
-            'inventory':            inventory,
-            'src':                  '/home/dim/git/enos/reservation.yaml.template.j2'
-        })
-        run_ansible([multiregion_playbook], inventory, env['config'], None)
+        if region in env['config']['multiregion']['assembly']:
+            assembly = env['config']['multiregion']['assembly'][region]
+            cluster = assembly.keys()[0]
+            env['config'].update({
+                'region':               region,
+                'resultdir':            env['resultdir'],
+                'cluster':              cluster,
+                'reservation_name':     assembly[cluster]['name'],
+                'roles':                regions[region]['provide'].keys(),
+                'inventory':            inventory,
+                'src':                  '/home/dim/git/enos/reservation.yaml.template.j2'
+            })
+            run_ansible([multiregion_playbook], inventory, env['config'], None)
 
 
 
